@@ -1,12 +1,12 @@
-defmodule Membrane.Template.Mixfile do
+defmodule Membrane.RTSP.Plugin.Mixfile do
   use Mix.Project
 
   @version "0.1.0"
-  @github_url "https://github.com/membraneframework/membrane_template_plugin"
+  @github_url "https://github.com/gBillal/membrane_rtsp_plugin"
 
   def project do
     [
-      app: :membrane_template_plugin,
+      app: :membrane_rtsp_plugin,
       version: @version,
       elixir: "~> 1.13",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -15,11 +15,11 @@ defmodule Membrane.Template.Mixfile do
       dialyzer: dialyzer(),
 
       # hex
-      description: "Template Plugin for Membrane Framework",
+      description: "Plugin to simplify connecting to RTSP servers",
       package: package(),
 
       # docs
-      name: "Membrane Template plugin",
+      name: "Membrane RTSP plugin",
       source_url: @github_url,
       docs: docs()
     ]
@@ -37,9 +37,13 @@ defmodule Membrane.Template.Mixfile do
   defp deps do
     [
       {:membrane_core, "~> 1.0"},
+      {:membrane_rtsp, "~> 0.6.0"},
+      {:membrane_rtp_plugin, "~> 0.27.1"},
+      {:membrane_tcp_plugin, "~> 0.2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
-      {:credo, ">= 0.0.0", only: :dev, runtime: false}
+      {:credo, ">= 0.0.0", only: :dev, runtime: false},
+      {:mimic, "~> 1.7", only: :test}
     ]
   end
 
@@ -58,11 +62,10 @@ defmodule Membrane.Template.Mixfile do
 
   defp package do
     [
-      maintainers: ["Membrane Team"],
+      maintainers: ["Billal Ghilas"],
       licenses: ["Apache-2.0"],
       links: %{
-        "GitHub" => @github_url,
-        "Membrane Framework Homepage" => "https://membrane.stream"
+        "GitHub" => @github_url
       }
     ]
   end
@@ -73,7 +76,7 @@ defmodule Membrane.Template.Mixfile do
       extras: ["README.md", "LICENSE"],
       formatters: ["html"],
       source_ref: "v#{@version}",
-      nest_modules_by_prefix: [Membrane.Template]
+      nest_modules_by_prefix: [Membrane.RTSP]
     ]
   end
 end
