@@ -3,7 +3,7 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/membrane_rtsp_plugin.svg)](https://hex.pm/packages/membrane_rtsp_plugin)
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/membrane_rtsp_plugin)
 
-Plugin simplifying connecting to RTSP servers.
+Plugin that simplifies connecting to RTSP servers.
 
 ## Installation
 
