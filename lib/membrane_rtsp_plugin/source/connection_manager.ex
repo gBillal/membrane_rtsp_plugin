@@ -9,8 +9,11 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   alias Membrane.RTSP
 
   @content_type_header [{"accept", "application/sdp"}]
-  @response_timeout :timer.seconds(15)
+  @response_timeout :timer.seconds(10)
   @keep_alive_interval :timer.seconds(15)
+
+  @udp_min_port 5000
+  @udp_max_port 65_000
 
   @type media_types :: [:video | :audio | :application]
   @type connection_opts :: %{stream_uri: binary(), allowed_media_types: media_types()}
@@ -41,10 +44,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
            {:ok, state} <- get_rtsp_description(state),
            {:ok, state} <- setup_rtsp_connection(state),
            :ok <- play(state) do
-        notify_parent(
-          state,
-          {:tracks, Enum.map(state.tracks, &elem(&1, 1)), RTSP.get_transport(state.rtsp_session)}
-        )
+        notify_parent(state, {:tracks, Map.values(state.tracks)})
 
         %{keep_alive(state) | status: :connected}
       else
@@ -121,18 +121,15 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
 
     state.tracks
     |> Enum.with_index()
-    |> Enum.reduce_while({:ok, state}, fn {{control_path, _track}, idx}, acc ->
-      transport_header = [
-        {"Transport", "RTP/AVP/TCP;unicast;interleaved=#{idx * 2}-#{idx * 2 + 1}"}
-      ]
-
-      case RTSP.setup(rtsp_session, control_path, transport_header) do
-        {:ok, %{status: 200}} ->
-          {:cont, acc}
-
-        result ->
+    |> Enum.reduce_while({:ok, state}, fn {{control_path, _track}, idx}, {:ok, state} ->
+      with {:ok, transport, transport_header} <- build_transport_header(state, idx),
+           {:ok, %{status: 200}} <- RTSP.setup(rtsp_session, control_path, transport_header) do
+        tracks = Map.update!(state.tracks, control_path, &%{&1 | transport: transport})
+        {:cont, {:ok, %{state | tracks: tracks}}}
+      else
+        error ->
           Membrane.Logger.debug(
-            "ConnectionManager: Setting up RTSP connection failed: #{inspect(result)}"
+            "ConnectionManager: Setting up RTSP connection failed: #{inspect(error)}"
           )
 
           {:halt, {:error, :setting_up_sdp_connection_failed, state}}
@@ -146,6 +143,36 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     case RTSP.play(rtsp_session) do
       {:ok, %{status: 200}} -> :ok
       _error -> {:error, :play_rtsp_failed, state}
+    end
+  end
+
+  defp build_transport_header(%{transport: :tcp} = state, media_id) do
+    {:ok, RTSP.get_transport(state.rtsp_session),
+     [{"Transport", "RTP/AVP/TCP;unicast;interleaved=#{media_id * 2}-#{media_id * 2 + 1}"}]}
+  end
+
+  defp build_transport_header(%{transport: :udp}, _media_id) do
+    @udp_min_port..@udp_max_port//2
+    |> Enum.shuffle()
+    |> Enum.reduce_while({:error, :no_free_port}, fn rtp_port, acc ->
+      if free_port?(rtp_port) and free_port?(rtp_port + 1) do
+        {:halt,
+         {:ok, {rtp_port, rtp_port + 1},
+          [{"Transport", "RTP/AVP;unicast;client_port=#{rtp_port}-#{rtp_port + 1}"}]}}
+      else
+        {:cont, acc}
+      end
+    end)
+  end
+
+  defp free_port?(port) do
+    case :gen_udp.open(port, reuseaddr: true) do
+      {:ok, socket} ->
+        :inet.close(socket)
+        true
+
+      _error ->
+        false
     end
   end
 
@@ -181,9 +208,11 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
        %{
          type: media.type,
          rtpmap: get_attribute(media, ExSDP.Attribute.RTPMapping),
-         fmtp: get_attribute(media, ExSDP.Attribute.FMTP)
+         fmtp: get_attribute(media, ExSDP.Attribute.FMTP),
+         transport: nil
        }}
     end)
+    |> Map.new()
   end
 
   defp get_attribute(video_attributes, attribute, default \\ nil) do

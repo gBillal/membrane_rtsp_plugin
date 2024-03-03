@@ -24,9 +24,14 @@ defmodule Membrane.RTSP.Source do
                 spec: [:video | :audio | :application],
                 default: [:video],
                 description: """
-                The type of streams to read from the RTSP server.
-                By default only video are streamed
+                The media type to accept from the RTSP server.
+                By default only video media are accepted.
                 """
+              ],
+              transport: [
+                spec: [:udp | :tcp],
+                default: :tcp,
+                description: "Set the rtsp transport protocol."
               ]
 
   def_output_pad :output,
@@ -45,7 +50,7 @@ defmodule Membrane.RTSP.Source do
 
   @impl true
   def handle_playing(_ctx, state) do
-    opts = Map.take(state, [:stream_uri, :allowed_media_types])
+    opts = Map.take(state, [:stream_uri, :allowed_media_types, :transport])
     {:ok, connection_manager} = ConnectionManager.start_link(opts)
     {[], %{state | connection_manager: connection_manager}}
   end
@@ -59,7 +64,9 @@ defmodule Membrane.RTSP.Source do
       ) do
     if track = Enum.find(state.tracks, fn track -> track.rtpmap.payload_type == pt end) do
       ssrc_to_track = Map.put(state.ssrc_to_track, ssrc, track)
-      {[notify_parent: {:new_track, ssrc, track}], %{state | ssrc_to_track: ssrc_to_track}}
+
+      {[notify_parent: {:new_track, ssrc, Map.delete(track, :transport)}],
+       %{state | ssrc_to_track: ssrc_to_track}}
     else
       {[], state}
     end
@@ -77,7 +84,7 @@ defmodule Membrane.RTSP.Source do
     spec = [
       get_child(:rtp_session)
       |> via_out(Pad.ref(:output, ssrc), options: [depayloader: get_rtp_depayloader(track)])
-      |> child({:rtp_parser, ssrc}, get_parser(track))
+      |> parser(track)
       |> bin_output(pad)
     ]
 
@@ -85,7 +92,7 @@ defmodule Membrane.RTSP.Source do
   end
 
   @impl true
-  def handle_info({:tracks, tracks, transport}, _ctx, state) do
+  def handle_info({:tracks, tracks}, _ctx, state) do
     Membrane.Logger.info("Received tracks: #{inspect(tracks)}")
 
     fmt_mapping =
@@ -94,12 +101,36 @@ defmodule Membrane.RTSP.Source do
       end)
       |> Enum.into(%{})
 
-    spec = [
-      child(:source, %Membrane.TCP.Source{connection_side: :client, local_socket: transport})
-      |> child(:tcp_depayloader, Decapsulator)
-      |> via_in(Pad.ref(:rtp_input, make_ref()))
-      |> child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})
-    ]
+    spec =
+      case state.transport do
+        :tcp ->
+          local_socket = List.first(tracks).transport
+
+          [
+            child(:source, %Membrane.TCP.Source{
+              connection_side: :client,
+              local_socket: local_socket
+            })
+            |> child(:tcp_depayloader, Decapsulator)
+            |> via_in(Pad.ref(:rtp_input, make_ref()))
+            |> child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})
+          ]
+
+        :udp ->
+          [child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})] ++
+            Enum.flat_map(tracks, fn track ->
+              {rtp_port, rtcp_port} = track.transport
+
+              [
+                child({:udp, make_ref()}, %Membrane.UDP.Source{local_port_no: rtp_port})
+                |> via_in(Pad.ref(:rtp_input, make_ref()))
+                |> get_child(:rtp_session),
+                child({:udp, make_ref()}, %Membrane.UDP.Source{local_port_no: rtcp_port})
+                |> via_in(Pad.ref(:rtp_input, make_ref()))
+                |> get_child(:rtp_session)
+              ]
+            end)
+      end
 
     {[spec: spec], %{state | tracks: tracks}}
   end
@@ -119,23 +150,28 @@ defmodule Membrane.RTSP.Source do
   defp get_rtp_depayloader(%{rtpmap: %{encoding: "H265"}}), do: Membrane.RTP.H265.Depayloader
   defp get_rtp_depayloader(_track), do: nil
 
-  defp get_parser(%{rtpmap: %{encoding: "H264"}} = track) do
+  defp parser(link_builder, %{rtpmap: %{encoding: "H264"}} = track) do
     sps = track.fmtp.sprop_parameter_sets && track.fmtp.sprop_parameter_sets.sps
     pps = track.fmtp.sprop_parameter_sets && track.fmtp.sprop_parameter_sets.pps
 
-    %Membrane.H264.Parser{spss: List.wrap(sps), ppss: List.wrap(pps), repeat_parameter_sets: true}
+    link_builder
+    |> child(:parser, %Membrane.H264.Parser{
+      spss: List.wrap(sps),
+      ppss: List.wrap(pps),
+      repeat_parameter_sets: true
+    })
   end
 
-  defp get_parser(%{rtpmap: %{encoding: "H265"}} = track) do
-    %Membrane.H265.Parser{
+  defp parser(link_builder, %{rtpmap: %{encoding: "H265"}} = track) do
+    child(link_builder, :parser, %Membrane.H265.Parser{
       vpss: List.wrap(track.fmtp.sprop_vps) |> Enum.map(&clean_parameter_set/1),
       spss: List.wrap(track.fmtp.sprop_sps) |> Enum.map(&clean_parameter_set/1),
       ppss: List.wrap(track.fmtp.sprop_pps) |> Enum.map(&clean_parameter_set/1),
       repeat_parameter_sets: true
-    }
+    })
   end
 
-  defp get_parser(_track), do: nil
+  defp parser(link_builder, _track), do: link_builder
 
   # a strange issue with one of Milesight camera where the parameter sets has
   # <<0, 0, 0, 1>> at the end

@@ -44,6 +44,7 @@ defmodule Membrane.RTSP.Plugin.Mixfile do
       {:membrane_tcp_plugin, "~> 0.2.0"},
       {:membrane_h264_plugin, "~> 0.9.0"},
       {:membrane_h265_plugin, "~> 0.4.0"},
+      {:membrane_udp_plugin, "~> 0.13.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false},

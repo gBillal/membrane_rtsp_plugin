@@ -16,16 +16,20 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
   m=video 0 RTP/AVP 96
   a=rtpmap:96 H264/90000
   a=fmtp:96 profile-level-id=42e01f;packetization-mode=1
+  a=control:/video
   m=audio 0 RTP/AVP 97
   a=rtpmap:97 OPUS/48000/2
   a=fmtp:97 minptime=10; useinbandfec=1
+  a=control:/audio
   m=application 0 RTP/AVP 98
+  a=control:/app
   """
 
   setup do
     opts = %{
       stream_uri: @stream_uri,
       allowed_media_types: @allowed_media_types,
+      transport: :tcp,
       parent_pid: self()
     }
 
@@ -37,6 +41,7 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
             %{
               stream_uri: @stream_uri,
               allowed_media_types: @allowed_media_types,
+              transport: :tcp,
               rtsp_session: nil,
               tracks: [],
               keep_alive_timer: nil,
@@ -55,9 +60,9 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
       {:ok, %Response{Response.new(200) | body: ExSDP.parse!(@sdp)}}
     end
 
-    expect(RTSP.setup(^pid, "", _headers), [num_calls: 3], do: {:ok, Response.new(200)})
+    expect(RTSP.setup(^pid, _control, _headers), [num_calls: 3], do: {:ok, Response.new(200)})
     expect(RTSP.play(^pid), do: {:ok, Response.new(200)})
-    expect(RTSP.get_transport(^pid), do: %{})
+    expect(RTSP.get_transport(^pid), [num_calls: 3], do: %{})
 
     assert {:ok, state} = ConnectionManager.init(opts)
 
@@ -65,8 +70,9 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
     assert state.status == :connected
     assert state.rtsp_session == pid
 
-    assert_received {:tracks, tracks, %{}}
+    assert_received {:tracks, tracks}
     assert length(tracks) == 3
+    assert [:application, :audio, :video] == Enum.map(tracks, & &1.type)
   end
 
   test "failed connection", %{opts: opts} do
