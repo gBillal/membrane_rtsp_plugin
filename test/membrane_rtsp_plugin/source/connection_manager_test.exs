@@ -91,4 +91,23 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
     assert {:noreply, %{status: :failed}} = ConnectionManager.handle_info(:connect, state)
     refute_received {:connection_failed, :setting_up_sdp_connection_failed}
   end
+
+  test "lost connection reset state", %{opts: opts} do
+    pid = :c.pid(0, 1, 1)
+
+    assert {:ok, state} = ConnectionManager.init(opts)
+
+    state = %{
+      state
+      | parent_pid: self(),
+        rtsp_session: pid,
+        status: :connected,
+        keep_alive_timer: make_ref()
+    }
+
+    assert {:noreply, %{rtsp_session: nil, status: :failed, keep_alive_timer: nil}} =
+             ConnectionManager.handle_info({:DOWN, make_ref(), :process, pid, :crash}, state)
+
+    assert_received {:connection_failed, :crash}
+  end
 end

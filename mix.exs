@@ -48,7 +48,8 @@ defmodule Membrane.RTSP.Plugin.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false},
-      {:mimic, "~> 1.7", only: :test}
+      {:mimic, "~> 1.7", only: :test},
+      {:membrane_file_plugin, "~> 0.17.0", only: :test}
     ]
   end
 

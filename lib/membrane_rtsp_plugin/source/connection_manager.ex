@@ -74,12 +74,13 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
           |> notify_parent({:connection_failed, reason})
           |> cancel_keep_alive()
           |> retry()
+          |> then(&%{&1 | status: :failed})
 
         _other ->
           state
       end
 
-    {:noreply, %{state | rtsp_session: nil, status: :init}}
+    {:noreply, %{state | rtsp_session: nil}}
   end
 
   def handle_info(message, state) do

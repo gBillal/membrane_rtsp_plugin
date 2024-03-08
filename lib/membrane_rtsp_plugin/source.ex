@@ -22,10 +22,9 @@ defmodule Membrane.RTSP.Source do
               ],
               allowed_media_types: [
                 spec: [:video | :audio | :application],
-                default: [:video],
+                default: [:video, :audio, :application],
                 description: """
                 The media type to accept from the RTSP server.
-                By default only video media are accepted.
                 """
               ],
               transport: [
@@ -81,12 +80,11 @@ defmodule Membrane.RTSP.Source do
   def handle_pad_added(Pad.ref(:output, ssrc) = pad, _ctx, state) do
     track = Map.fetch!(state.ssrc_to_track, ssrc)
 
-    spec = [
+    spec =
       get_child(:rtp_session)
       |> via_out(Pad.ref(:output, ssrc), options: [depayloader: get_rtp_depayloader(track)])
       |> parser(track)
       |> bin_output(pad)
-    ]
 
     {[spec: spec], state}
   end
@@ -106,15 +104,13 @@ defmodule Membrane.RTSP.Source do
         :tcp ->
           local_socket = List.first(tracks).transport
 
-          [
-            child(:source, %Membrane.TCP.Source{
-              connection_side: :client,
-              local_socket: local_socket
-            })
-            |> child(:tcp_depayloader, Decapsulator)
-            |> via_in(Pad.ref(:rtp_input, make_ref()))
-            |> child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})
-          ]
+          child(:source, %Membrane.TCP.Source{
+            connection_side: :client,
+            local_socket: local_socket
+          })
+          |> child(:tcp_depayloader, Decapsulator)
+          |> via_in(Pad.ref(:rtp_input, make_ref()))
+          |> child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})
 
         :udp ->
           [child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})] ++
@@ -154,8 +150,7 @@ defmodule Membrane.RTSP.Source do
     sps = track.fmtp.sprop_parameter_sets && track.fmtp.sprop_parameter_sets.sps
     pps = track.fmtp.sprop_parameter_sets && track.fmtp.sprop_parameter_sets.pps
 
-    link_builder
-    |> child(:parser, %Membrane.H264.Parser{
+    child(link_builder, {:parser, make_ref()}, %Membrane.H264.Parser{
       spss: List.wrap(sps),
       ppss: List.wrap(pps),
       repeat_parameter_sets: true
@@ -163,10 +158,10 @@ defmodule Membrane.RTSP.Source do
   end
 
   defp parser(link_builder, %{rtpmap: %{encoding: "H265"}} = track) do
-    child(link_builder, :parser, %Membrane.H265.Parser{
-      vpss: List.wrap(track.fmtp.sprop_vps) |> Enum.map(&clean_parameter_set/1),
-      spss: List.wrap(track.fmtp.sprop_sps) |> Enum.map(&clean_parameter_set/1),
-      ppss: List.wrap(track.fmtp.sprop_pps) |> Enum.map(&clean_parameter_set/1),
+    child(link_builder, {:parser, make_ref()}, %Membrane.H265.Parser{
+      vpss: List.wrap(track.fmtp && track.fmtp.sprop_vps) |> Enum.map(&clean_parameter_set/1),
+      spss: List.wrap(track.fmtp && track.fmtp.sprop_sps) |> Enum.map(&clean_parameter_set/1),
+      ppss: List.wrap(track.fmtp && track.fmtp.sprop_pps) |> Enum.map(&clean_parameter_set/1),
       repeat_parameter_sets: true
     })
   end
