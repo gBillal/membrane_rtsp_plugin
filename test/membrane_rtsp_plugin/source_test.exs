@@ -23,7 +23,9 @@ defmodule Membrane.RTSP.SourceTest do
         child(:source, %Membrane.RTSP.Source{
           transport: opts[:transport] || :tcp,
           allowed_media_types: opts[:allowed_media_types] || [:video, :audio, :application],
-          stream_uri: "rtsp://localhost:#{opts[:port]}/"
+          stream_uri: "rtsp://localhost:#{opts[:port]}/",
+          timeout: opts[:timeout] || :timer.seconds(15),
+          keep_alive_interval: opts[:keep_alive_interval] || :timer.seconds(15)
         })
 
       {[spec: spec], %{dest_folder: opts[:dest_folder]}}
@@ -147,7 +149,13 @@ defmodule Membrane.RTSP.SourceTest do
 
     options = [
       module: TestPipeline,
-      custom_args: %{port: port, dest_folder: tmp_dir, transport: :udp}
+      custom_args: %{
+        port: port,
+        dest_folder: tmp_dir,
+        transport: :udp,
+        timeout: :timer.seconds(1),
+        keep_alive_interval: :timer.seconds(1)
+      }
     ]
 
     pid = Membrane.Testing.Pipeline.start_link_supervised!(options)
@@ -170,10 +178,20 @@ defmodule Membrane.RTSP.SourceTest do
       {:new_track, _ssrc, %{type: :application, rtpmap: %{encoding: "plain"}}}
     )
 
+    assert_pipeline_notified(pid, :source, {:connection_failed, _reason}, 5_000)
     :ok = Membrane.Testing.Pipeline.terminate(pid)
 
     assert File.exists?(Path.join(tmp_dir, "out.h264"))
     assert File.exists?(Path.join(tmp_dir, "out.hevc"))
     assert File.exists?(Path.join(tmp_dir, "out.txt"))
+
+    assert File.read!(Path.join(tmp_dir, "out.h264")) == File.read!("test/fixtures/in.h264"),
+           "content is not the same"
+
+    assert File.read!(Path.join(tmp_dir, "out.hevc")) == File.read!("test/fixtures/in.hevc"),
+           "content is not the same"
+
+    assert File.read!(Path.join(tmp_dir, "out.txt")) == File.read!("test/fixtures/in.txt"),
+           "content is not the same"
   end
 end

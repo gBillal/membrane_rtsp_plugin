@@ -31,6 +31,19 @@ defmodule Membrane.RTSP.Source do
                 spec: [:udp | :tcp],
                 default: :tcp,
                 description: "Set the rtsp transport protocol."
+              ],
+              timeout: [
+                spec: non_neg_integer(),
+                default: :timer.seconds(15),
+                description: "Set timeout to wait for response to an RTSP request"
+              ],
+              keep_alive_interval: [
+                spec: non_neg_integer(),
+                default: :timer.seconds(15),
+                description: """
+                Set the interval for the keep alive ping sent by the client
+                to keep the RTSP connection alive
+                """
               ]
 
   def_output_pad :output,
@@ -49,7 +62,15 @@ defmodule Membrane.RTSP.Source do
 
   @impl true
   def handle_playing(_ctx, state) do
-    opts = Map.take(state, [:stream_uri, :allowed_media_types, :transport])
+    opts =
+      Map.take(state, [
+        :stream_uri,
+        :allowed_media_types,
+        :transport,
+        :timeout,
+        :keep_alive_interval
+      ])
+
     {:ok, connection_manager} = ConnectionManager.start_link(opts)
     {[], %{state | connection_manager: connection_manager}}
   end

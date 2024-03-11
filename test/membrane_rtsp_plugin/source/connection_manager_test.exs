@@ -30,6 +30,8 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
       stream_uri: @stream_uri,
       allowed_media_types: @allowed_media_types,
       transport: :tcp,
+      timeout: :timer.seconds(15),
+      keep_alive_interval: :timer.seconds(15),
       parent_pid: self()
     }
 
@@ -42,6 +44,8 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
               stream_uri: @stream_uri,
               allowed_media_types: @allowed_media_types,
               transport: :tcp,
+              timeout: :timer.seconds(15),
+              keep_alive_interval: :timer.seconds(15),
               rtsp_session: nil,
               tracks: [],
               keep_alive_timer: nil,

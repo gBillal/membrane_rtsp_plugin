@@ -9,8 +9,6 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   alias Membrane.RTSP
 
   @content_type_header [{"accept", "application/sdp"}]
-  @response_timeout :timer.seconds(10)
-  @keep_alive_interval :timer.seconds(15)
 
   @udp_min_port 5000
   @udp_max_port 65_000
@@ -61,7 +59,6 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
 
   @impl true
   def handle_info(:keep_alive, state) do
-    RTSP.get_parameter_no_response(state.rtsp_session)
     {:noreply, keep_alive(state)}
   end
 
@@ -89,9 +86,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   end
 
   defp start_rtsp_connection(state) do
-    case RTSP.start(state.stream_uri, RTSP.Transport.TCPSocket,
-           response_timeout: @response_timeout
-         ) do
+    case RTSP.start(state.stream_uri, RTSP.Transport.TCPSocket, response_timeout: state.timeout) do
       {:ok, session} ->
         Process.monitor(session)
         {:ok, %{state | rtsp_session: session}}
@@ -180,7 +175,11 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   defp keep_alive(state) do
     Membrane.Logger.debug("Send GET_PARAMETER to keep session alive")
     RTSP.get_parameter_no_response(state.rtsp_session)
-    %{state | keep_alive_timer: Process.send_after(self(), :keep_alive, @keep_alive_interval)}
+
+    %{
+      state
+      | keep_alive_timer: Process.send_after(self(), :keep_alive, state.keep_alive_interval)
+    }
   end
 
   defp cancel_keep_alive(state) do
