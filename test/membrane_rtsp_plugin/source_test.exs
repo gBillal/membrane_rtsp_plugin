@@ -13,6 +13,7 @@ defmodule Membrane.RTSP.SourceTest do
 
     use Membrane.Pipeline
 
+    @spec start(Keyword.t() | map()) :: GenServer.on_start()
     def start(options) do
       Pipeline.start(__MODULE__, options)
     end
@@ -142,11 +143,6 @@ defmodule Membrane.RTSP.SourceTest do
   end
 
   test "stream all media using udp", %{server_port: port, tmp_dir: tmp_dir} do
-    # TODO: better test for UDP
-    # right now, I don't have a way to send end of stream in the pipeline
-    # since the UDP socket won't send any nor does it catch the server socket
-    # disconnection
-
     options = [
       module: TestPipeline,
       custom_args: %{

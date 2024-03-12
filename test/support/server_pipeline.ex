@@ -49,6 +49,7 @@ defmodule Membrane.RTSP.UDP.Sink do
 end
 
 defmodule Membrane.RTP.Plain.Payloader do
+  @moduledoc false
   use Membrane.Filter
 
   alias Membrane.RTP
@@ -86,6 +87,7 @@ defmodule Membrane.RTSP.ServerPipeline do
     plain: Membrane.RTP.Plain.Payloader
   }
 
+  @spec start_link(list()) :: Membrane.Pipeline.on_start()
   def start_link(sources) do
     Membrane.Pipeline.start_link(__MODULE__, sources)
   end

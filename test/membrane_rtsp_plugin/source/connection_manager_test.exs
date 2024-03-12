@@ -50,7 +50,8 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
               tracks: [],
               keep_alive_timer: nil,
               status: :init,
-              parent_pid: self()
+              parent_pid: self(),
+              reconnect_attempt: 0
             }} ==
              ConnectionManager.init(opts)
   end

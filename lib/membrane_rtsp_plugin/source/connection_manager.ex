@@ -13,6 +13,9 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   @udp_min_port 5000
   @udp_max_port 65_000
 
+  @base_back_off_in_ms 10
+  @max_back_off_in_ms :timer.minutes(2)
+
   @type media_types :: [:video | :audio | :application]
   @type connection_opts :: %{stream_uri: binary(), allowed_media_types: media_types()}
 
@@ -28,7 +31,8 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
         rtsp_session: nil,
         tracks: [],
         status: :init,
-        keep_alive_timer: nil
+        keep_alive_timer: nil,
+        reconnect_attempt: 0
       })
 
     Process.send_after(self(), :connect, 0)
@@ -42,9 +46,9 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
            {:ok, state} <- get_rtsp_description(state),
            {:ok, state} <- setup_rtsp_connection(state),
            :ok <- play(state) do
-        notify_parent(state, {:tracks, Map.values(state.tracks)})
-
-        %{keep_alive(state) | status: :connected}
+        %{state | status: :connected, reconnect_attempt: 0}
+        |> notify_parent({:tracks, Map.values(state.tracks)})
+        |> keep_alive()
       else
         {:error, reason, state} ->
           Logger.error("could not connect to RTSP server due to: #{inspect(reason)}")
@@ -183,7 +187,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   end
 
   defp cancel_keep_alive(state) do
-    :timer.cancel(state.keep_alive_timer)
+    Process.cancel_timer(state.keep_alive_timer)
     %{state | keep_alive_timer: nil}
   end
 
@@ -195,9 +199,15 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     state
   end
 
-  defp retry(state) do
-    Process.send_after(self(), :connect, :timer.seconds(3))
-    state
+  defp retry(%{reconnect_attempt: attempt} = state) do
+    delay =
+      :math.pow(2, attempt)
+      |> Kernel.*(@base_back_off_in_ms)
+      |> min(@max_back_off_in_ms)
+      |> trunc()
+
+    Process.send_after(self(), :connect, delay)
+    %{state | reconnect_attempt: attempt + 1}
   end
 
   defp get_tracks(%{body: %ExSDP{media: media_list}}, stream_types) do
