@@ -2,6 +2,14 @@ defmodule Membrane.RTSP.Source do
   @moduledoc """
   Source bin responsible for connecting to an RTSP server.
 
+  This element connects to an RTSP server, depayload and parse the received media if possible.
+  If there's no suitable depayloader and parser, the raw payload is sent to the subsequent elements in
+  the pipeline.
+
+  The following codecs are depayloaded and parsed:
+    * `H264`
+    * `H265`
+
   ### Notifications
     * `{:new_track, ssrc, track}` - sent when the track is parsed and available for consumption by the upper
     elements. The output pad should be linked to receive the data.
@@ -35,14 +43,14 @@ defmodule Membrane.RTSP.Source do
               timeout: [
                 spec: non_neg_integer(),
                 default: :timer.seconds(15),
-                description: "Set timeout to wait for response to an RTSP request"
+                description: "Set RTSP response timeout"
               ],
               keep_alive_interval: [
                 spec: non_neg_integer(),
                 default: :timer.seconds(15),
                 description: """
-                Set the interval for the keep alive ping sent by the client
-                to keep the RTSP connection alive
+                Send a heartbeat to the RTSP server at a regular interval to
+                keep the session alive.
                 """
               ]
 

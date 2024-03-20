@@ -19,4 +19,53 @@ end
 
 ## Usage
 
-TODO
+The following pipeline reads only video from a local RTSP server using `TCP` transport
+
+```elixir
+defmodule RtspPipeline do
+  @moduledoc false
+
+  use Membrane.Pipeline
+
+  def start() do
+    Pipeline.start(__MODULE__, options)
+  end
+
+  @impl true
+  def handle_init(_ctx, _opts) do
+    spec = [
+      child(:source, %Membrane.RTSP.Source{
+        transport: :tcp,
+        allowed_media_types: [:video],
+        stream_uri: "rtsp://localhost:8554/mystream"
+      })
+    ]
+
+    {[spec: spec], %{}}
+  end
+
+  @impl true
+  def handle_child_notification({:new_track, ssrc, _track}, _element, _ctx, state) do
+    spec = [
+      get_child(:source)
+      |> via_out(Pad.ref(:output, ssrc))
+      |> child(:funnel, Membrane.Funnel)
+      |> child(:sink, , %Membrane.File.Source{
+        location: "video.h264"
+      })
+    ]
+
+    {[spec: spec], state}
+  end
+
+  @impl true
+  def handle_child_notification(_message, _element, _ctx, state) do
+    {[], state}
+  end
+
+  @impl true
+  def handle_child_pad_removed(:source, _pad, _ctx, state) do
+    {[], state}
+  end
+end
+```
