@@ -54,6 +54,11 @@ defmodule Membrane.RTSP.SourceTest do
     def handle_child_notification(_message, _element, _ctx, state) do
       {[], state}
     end
+
+    @impl true
+    def handle_child_pad_removed(_child, _pad, _ctx, state) do
+      {[], state}
+    end
   end
 
   setup_all do

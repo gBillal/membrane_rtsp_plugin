@@ -22,7 +22,7 @@ defmodule Membrane.RTSP.Source do
 
   require Membrane.Logger
 
-  alias __MODULE__.{ConnectionManager, Decapsulator}
+  alias __MODULE__.{ConnectionManager, Decapsulator, TCP}
 
   def_options stream_uri: [
                 spec: binary(),
@@ -63,7 +63,7 @@ defmodule Membrane.RTSP.Source do
     state =
       options
       |> Map.from_struct()
-      |> Map.merge(%{connection_manager: nil, tracks: [], ssrc_to_track: %{}})
+      |> Map.merge(%{connection_manager: nil, tracks: [], ssrc_to_track: %{}, tcp_socket: nil})
 
     {[], state}
   end
@@ -101,6 +101,14 @@ defmodule Membrane.RTSP.Source do
   end
 
   @impl true
+  def handle_child_notification({:pid, pid}, :source, _ctx, %{tcp_socket: socket} = state) do
+    # Socket active mode consumes much less cpu that non-active mode.
+    :ok = :gen_tcp.controlling_process(socket, pid)
+    :ok = :inet.setopts(socket, active: true)
+    {[], state}
+  end
+
+  @impl true
   def handle_child_notification(_notification, _element, _ctx, state) do
     {[], state}
   end
@@ -128,20 +136,20 @@ defmodule Membrane.RTSP.Source do
       end)
       |> Enum.into(%{})
 
-    spec =
-      case state.transport do
-        :tcp ->
-          local_socket = List.first(tracks).transport
+    case state.transport do
+      :tcp ->
+        local_socket = List.first(tracks).transport
 
-          child(:source, %Membrane.TCP.Source{
-            connection_side: :client,
-            local_socket: local_socket
-          })
+        spec =
+          child(:source, %TCP{local_socket: local_socket})
           |> child(:tcp_depayloader, Decapsulator)
           |> via_in(Pad.ref(:rtp_input, make_ref()))
           |> child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})
 
-        :udp ->
+        {[spec: spec], %{state | tracks: tracks, tcp_socket: local_socket}}
+
+      :udp ->
+        spec =
           [child(:rtp_session, %Membrane.RTP.SessionBin{fmt_mapping: fmt_mapping})] ++
             Enum.flat_map(tracks, fn track ->
               {rtp_port, rtcp_port} = track.transport
@@ -155,9 +163,9 @@ defmodule Membrane.RTSP.Source do
                 |> get_child(:rtp_session)
               ]
             end)
-      end
 
-    {[spec: spec], %{state | tracks: tracks}}
+        {[spec: spec], %{state | tracks: tracks}}
+    end
   end
 
   @impl true

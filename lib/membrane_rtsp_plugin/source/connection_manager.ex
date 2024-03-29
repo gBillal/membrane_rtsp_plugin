@@ -5,8 +5,8 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
 
   require Membrane.Logger
 
-  require Logger
   alias Membrane.RTSP
+  alias Membrane.RTSP.Source.Transport.TCPWrapper
 
   @content_type_header [{"accept", "application/sdp"}]
 
@@ -51,7 +51,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
         |> keep_alive()
       else
         {:error, reason, state} ->
-          Logger.error("could not connect to RTSP server due to: #{inspect(reason)}")
+          Membrane.Logger.error("could not connect to RTSP server due to: #{inspect(reason)}")
           if is_pid(state.rtsp_session), do: RTSP.close(state.rtsp_session)
 
           state = notify_parent(state, {:connection_failed, reason}) |> retry()
@@ -90,7 +90,9 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   end
 
   defp start_rtsp_connection(state) do
-    case RTSP.start(state.stream_uri, RTSP.Transport.TCPSocket, response_timeout: state.timeout) do
+    options = [response_timeout: state.timeout, controlling_process: state.parent_pid]
+
+    case RTSP.start(state.stream_uri, TCPWrapper, options) do
       {:ok, session} ->
         Process.monitor(session)
         {:ok, %{state | rtsp_session: session}}
