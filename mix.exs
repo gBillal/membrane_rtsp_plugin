@@ -1,7 +1,7 @@
 defmodule Membrane.RTSP.Plugin.Mixfile do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.2"
   @github_url "https://github.com/gBillal/membrane_rtsp_plugin"
 
   def project do
@@ -42,7 +42,7 @@ defmodule Membrane.RTSP.Plugin.Mixfile do
       {:membrane_rtp_h264_plugin, "~> 0.19.0"},
       {:membrane_rtp_h265_plugin, "~> 0.5.0"},
       {:membrane_tcp_plugin, "~> 0.2.0"},
-      {:membrane_h26x_plugin, github: "membraneframework/membrane_h26x_plugin", ref: "3279d78"},
+      {:membrane_h26x_plugin, "~> 0.10.0"},
       {:membrane_udp_plugin, "~> 0.13.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},

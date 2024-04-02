@@ -24,6 +24,11 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     GenServer.start_link(__MODULE__, Map.put(options, :parent_pid, self()))
   end
 
+  @spec stop(pid()) :: :ok
+  def stop(server) do
+    GenServer.call(server, :stop)
+  end
+
   @impl true
   def init(options) do
     state =
@@ -84,9 +89,16 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     {:noreply, %{state | rtsp_session: nil}}
   end
 
+  @impl true
   def handle_info(message, state) do
     Membrane.Logger.warning("received unexpected message: #{inspect(message)}")
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_call(:stop, _from, state) do
+    Membrane.RTSP.close(state.rtsp_session)
+    {:stop, :normal, :ok, state}
   end
 
   defp start_rtsp_connection(state) do
@@ -179,7 +191,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   end
 
   defp keep_alive(state) do
-    Membrane.Logger.debug("Send GET_PARAMETER to keep session alive")
+    Membrane.Logger.info("Send GET_PARAMETER to keep session alive")
     RTSP.get_parameter_no_response(state.rtsp_session)
 
     %{

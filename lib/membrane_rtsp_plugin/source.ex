@@ -179,6 +179,12 @@ defmodule Membrane.RTSP.Source do
     {[], state}
   end
 
+  @impl true
+  def handle_terminate_request(_ctx, state) do
+    ConnectionManager.stop(state.connection_manager)
+    {[terminate: :normal], state}
+  end
+
   defp get_rtp_depayloader(%{rtpmap: %{encoding: "H264"}}), do: Membrane.RTP.H264.Depayloader
   defp get_rtp_depayloader(%{rtpmap: %{encoding: "H265"}}), do: Membrane.RTP.H265.Depayloader
   defp get_rtp_depayloader(_track), do: nil

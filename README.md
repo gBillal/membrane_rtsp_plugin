@@ -12,7 +12,7 @@ Add the following line to your deps in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:membrane_rtsp_plugin, github: "gBillal/membrane_rtsp_plugin", tag: "v0.1.0"}
+    {:membrane_rtsp_plugin, github: "gBillal/membrane_rtsp_plugin", tag: "v0.1.2"}
   ]
 end
 ```
