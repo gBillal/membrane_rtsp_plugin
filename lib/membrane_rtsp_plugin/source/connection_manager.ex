@@ -191,7 +191,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   end
 
   defp keep_alive(state) do
-    Membrane.Logger.info("Send GET_PARAMETER to keep session alive")
+    Membrane.Logger.debug("Send GET_PARAMETER to keep session alive")
     RTSP.get_parameter_no_response(state.rtsp_session)
 
     %{
@@ -220,6 +220,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
       |> min(@max_back_off_in_ms)
       |> trunc()
 
+    Membrane.Logger.info("retry connection in #{delay} ms")
     Process.send_after(self(), :connect, delay)
     %{state | reconnect_attempt: attempt + 1}
   end
