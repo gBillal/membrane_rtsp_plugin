@@ -43,19 +43,12 @@ defmodule Membrane.RTSP.Source.Decapsulator do
 
   @impl true
   def handle_buffer(:input, %Buffer{payload: payload, metadata: metadata}, _ctx, state) do
-    unprocessed_data =
-      if rtsp_response?(state.unprocessed_data, payload) do
-        if state.rtsp_session != nil do
-          {:ok, %RTSP.Response{status: 200}} =
-            RTSP.handle_response(state.rtsp_session, state.unprocessed_data)
-        end
-
-        <<>>
-      else
-        state.unprocessed_data
-      end
-
-    packets_binary = unprocessed_data <> payload
+    # Some IP Cameras doesn't send whole RTP packets, so RTSP messages may come with
+    # RTP data in the same network packet
+    packets_binary =
+      if String.starts_with?(state.unprocessed_data, "RTSP"),
+        do: parse_rtsp_response(state.unprocessed_data <> payload),
+        else: state.unprocessed_data <> payload
 
     {unprocessed_data, complete_packets_binaries} = get_complete_packets(packets_binary)
 
@@ -65,9 +58,21 @@ defmodule Membrane.RTSP.Source.Decapsulator do
     {[buffer: {:output, packets_buffers}], %{state | unprocessed_data: unprocessed_data}}
   end
 
-  @spec rtsp_response?(binary(), binary()) :: boolean()
-  defp rtsp_response?(maybe_rtsp_response, new_payload) do
-    String.starts_with?(new_payload, "$") and String.starts_with?(maybe_rtsp_response, "RTSP")
+  defp parse_rtsp_response(data) do
+    with {:ok, %{status: 200} = resp} <- RTSP.Response.parse(data),
+         length <- get_resp_content_length(resp),
+         true <- byte_size(resp.body) >= length do
+      :binary.part(resp.body, length, byte_size(resp.body) - length)
+    else
+      _other -> data
+    end
+  end
+
+  defp get_resp_content_length(resp) do
+    case RTSP.Response.get_header(resp, "Content-Length") do
+      {:ok, length} -> String.to_integer(length)
+      _error -> 0
+    end
   end
 
   @spec get_complete_packets(binary()) ::
