@@ -98,8 +98,8 @@ defmodule Membrane.RTSP.Source.Decapsulator do
     end
   end
 
-  defp get_complete_packets(rtsp_message, _complete_packets_binaries) do
+  defp get_complete_packets(rtsp_message, complete_packets_binaries) do
     # If the payload doesn't start with a "$" then it must be a RTSP message (or a part of it)
-    {rtsp_message, []}
+    {rtsp_message, complete_packets_binaries}
   end
 end
