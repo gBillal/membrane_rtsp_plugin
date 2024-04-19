@@ -127,6 +127,18 @@ defmodule Membrane.RTSP.Source do
   end
 
   @impl true
+  def handle_element_end_of_stream(:tcp_depayloader, _pad, ctx, state) do
+    ConnectionManager.reconnect(state.connection_manager)
+    {[remove_children: Map.keys(ctx.children), notify_parent: {:connection_failed, :closed}],
+     state}
+  end
+
+  @impl true
+  def handle_element_end_of_stream(element, pad, ctx, state) do
+    super(element, pad, ctx, state)
+  end
+
+  @impl true
   def handle_info({:tracks, tracks}, _ctx, state) do
     Membrane.Logger.info("Received tracks: #{inspect(tracks)}")
 

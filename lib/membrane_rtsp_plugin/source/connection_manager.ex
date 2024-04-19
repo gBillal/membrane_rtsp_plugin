@@ -29,6 +29,11 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     GenServer.call(server, :stop)
   end
 
+  @spec reconnect(pid()) :: :ok
+  def reconnect(server) do
+    GenServer.call(server, :reconnect)
+  end
+
   @impl true
   def init(options) do
     state =
@@ -99,6 +104,12 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   def handle_call(:stop, _from, state) do
     Membrane.RTSP.close(state.rtsp_session)
     {:stop, :normal, :ok, state}
+  end
+
+  @impl true
+  def handle_call(:reconnect, _from, state) do
+    Membrane.RTSP.close(state.rtsp_session)
+    {:reply, :ok, state}
   end
 
   defp start_rtsp_connection(state) do
