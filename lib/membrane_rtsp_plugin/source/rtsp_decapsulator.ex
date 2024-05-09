@@ -59,7 +59,11 @@ defmodule Membrane.RTSP.Source.Decapsulator do
   end
 
   defp parse_rtsp_response(data) do
-    with {:ok, %{status: 200} = resp} <- RTSP.Response.parse(data),
+    # Don't check for response status
+    # Some AXIS cameras returns 401 for get parameter
+    # requests and the stream is not interrupted
+    # TODO: refresh the digest token
+    with {:ok, resp} <- RTSP.Response.parse(data),
          length <- get_resp_content_length(resp),
          true <- byte_size(resp.body) >= length do
       :binary.part(resp.body, length, byte_size(resp.body) - length)
