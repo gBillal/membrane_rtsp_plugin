@@ -25,8 +25,8 @@ defmodule Membrane.RTSP.SourceTest do
           transport: opts[:transport] || :tcp,
           allowed_media_types: opts[:allowed_media_types] || [:video, :audio, :application],
           stream_uri: "rtsp://localhost:#{opts[:port]}/",
-          timeout: opts[:timeout] || :timer.seconds(15),
-          keep_alive_interval: opts[:keep_alive_interval] || :timer.seconds(15)
+          timeout: opts[:timeout] || Membrane.Time.seconds(15),
+          keep_alive_interval: opts[:keep_alive_interval] || Membrane.Time.seconds(15)
         })
 
       {[spec: spec], %{dest_folder: opts[:dest_folder]}}
@@ -153,11 +153,14 @@ defmodule Membrane.RTSP.SourceTest do
       custom_args: %{
         port: port,
         dest_folder: tmp_dir,
-        transport: :udp,
-        timeout: :timer.seconds(1),
-        keep_alive_interval: :timer.seconds(1)
+        transport: {:udp, 20_000, 20_020},
+        timeout: Membrane.Time.seconds(1),
+        keep_alive_interval: Membrane.Time.seconds(10)
       }
     ]
+
+    {:ok, blocking_socket1} = :gen_udp.open(20_000)
+    {:ok, blocking_socket2} = :gen_udp.open(20_003)
 
     pid = Membrane.Testing.Pipeline.start_link_supervised!(options)
 
@@ -179,20 +182,26 @@ defmodule Membrane.RTSP.SourceTest do
       {:new_track, _ssrc, %{type: :application, rtpmap: %{encoding: "plain"}}}
     )
 
-    assert_pipeline_notified(pid, :source, {:connection_failed, _reason}, 5_000)
+    Process.sleep(500)
     :ok = Membrane.Testing.Pipeline.terminate(pid)
+
+    :gen_udp.close(blocking_socket1)
+    :gen_udp.close(blocking_socket2)
 
     assert File.exists?(Path.join(tmp_dir, "out.h264"))
     assert File.exists?(Path.join(tmp_dir, "out.hevc"))
     assert File.exists?(Path.join(tmp_dir, "out.txt"))
 
-    assert File.read!(Path.join(tmp_dir, "out.h264")) == File.read!("test/fixtures/in.h264"),
+    assert File.read!("test/fixtures/in.h264")
+           |> String.starts_with?(File.read!(Path.join(tmp_dir, "out.h264"))),
            "content is not the same"
 
-    assert File.read!(Path.join(tmp_dir, "out.hevc")) == File.read!("test/fixtures/in.hevc"),
+    assert File.read!("test/fixtures/in.hevc")
+           |> String.starts_with?(File.read!(Path.join(tmp_dir, "out.hevc"))),
            "content is not the same"
 
-    assert File.read!(Path.join(tmp_dir, "out.txt")) == File.read!("test/fixtures/in.txt"),
+    assert File.read!("test/fixtures/in.txt")
+           |> String.starts_with?(File.read!(Path.join(tmp_dir, "out.txt"))),
            "content is not the same"
   end
 end

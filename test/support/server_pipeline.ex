@@ -32,7 +32,7 @@ defmodule Membrane.RTSP.UDP.Sink do
 
   def_options(
     socket: [spec: :inet.socket()],
-    address: [spec: :inet.ipaddress()],
+    address: [spec: :inet.ip_address()],
     port: [spec: :inet.port_number()]
   )
 
