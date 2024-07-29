@@ -3,7 +3,11 @@ defmodule Membrane.RTSP.Source.Decapsulator do
 
   use Membrane.Filter
 
+  require Logger
+
   alias Membrane.{Buffer, RemoteStream, RTP, RTSP}
+
+  @max_buffer_size 5 * 1024 * 1024
 
   def_options rtsp_session: [
                 spec: pid() | nil,
@@ -102,8 +106,12 @@ defmodule Membrane.RTSP.Source.Decapsulator do
     end
   end
 
+  defp get_complete_packets(data, _packets) when byte_size(data) >= @max_buffer_size do
+    Logger.error("Message too big, size: #{byte_size(data)} bytes")
+    raise "rtp/rtsp message too big"
+  end
+
   defp get_complete_packets(rtsp_message, complete_packets_binaries) do
-    # If the payload doesn't start with a "$" then it must be a RTSP message (or a part of it)
     {rtsp_message, complete_packets_binaries}
   end
 end
