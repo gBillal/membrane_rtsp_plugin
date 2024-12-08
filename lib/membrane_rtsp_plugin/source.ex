@@ -32,6 +32,7 @@ defmodule Membrane.RTSP.Source do
   @type track :: %{
           control_path: String.t(),
           type: :video | :audio | :application,
+          framerate: ExSDP.Attribute.framerate_value() | nil,
           fmtp: ExSDP.Attribute.FMTP.t() | nil,
           rtpmap: ExSDP.Attribute.RTPMapping.t() | nil
         }

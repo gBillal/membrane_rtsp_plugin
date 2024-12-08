@@ -18,6 +18,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   @type track :: %{
           control_path: String.t(),
           type: :video | :audio | :application,
+          framerate: ExSDP.Attribute.framerate_value() | nil,
           fmtp: ExSDP.Attribute.FMTP.t() | nil,
           rtpmap: ExSDP.Attribute.RTPMapping.t() | nil,
           transport: track_transport()
@@ -225,6 +226,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     |> Enum.map(fn media ->
       %{
         control_path: get_attribute(media, "control", ""),
+        framerate: get_attribute(media, :framerate, nil),
         type: media.type,
         rtpmap: get_attribute(media, ExSDP.Attribute.RTPMapping),
         fmtp: get_attribute(media, ExSDP.Attribute.FMTP),
