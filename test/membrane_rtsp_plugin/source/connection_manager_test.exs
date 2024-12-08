@@ -15,6 +15,7 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
   t=0 0
   m=video 0 RTP/AVP 96
   a=rtpmap:96 H264/90000
+  a=framerate:30
   a=fmtp:96 profile-level-id=42e01f;packetization-mode=1
   a=control:/video
   m=audio 0 RTP/AVP 97
@@ -64,6 +65,7 @@ defmodule Membrane.RTSP.Source.ConnectionManagerTest do
 
     assert length(state.tracks) == 3
     assert [:application, :audio, :video] == Enum.map(state.tracks, & &1.type)
+    assert [nil, nil, 30.0] == Enum.map(state.tracks, & &1.framerate)
   end
 
   test "failed connection", %{state: state} do
