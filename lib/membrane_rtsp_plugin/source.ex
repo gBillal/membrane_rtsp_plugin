@@ -12,6 +12,7 @@ defmodule Membrane.RTSP.Source do
     * `H264`
     * `H265`
     * `AAC` (if sent according to RFC3640)
+    * `Opus`
 
   When the element finishes setting up all tracks it will send a `t:set_up_tracks/0` notification.
   Each time a track is parsed and available for further processing the element will send a

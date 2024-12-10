@@ -12,7 +12,7 @@ Add the following line to your deps in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:membrane_rtsp_plugin, "~> 0.5.1"}
+    {:membrane_rtsp_plugin, "~> 0.6.0"}
   ]
 end
 ```
