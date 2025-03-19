@@ -200,18 +200,24 @@ defmodule Membrane.RTSP.Source do
   def handle_pad_added(Pad.ref(:output, control_path) = pad, _ctx, state) do
     track = Enum.find(state.tracks, &(&1.control_path == control_path))
 
-    demuxer_name =
+    {demuxer_name, jitter_buffer_latency} =
       case state.transport do
-        :tcp -> :rtp_demuxer
-        {:udp, _port_range_start, _port_range_end} -> {:rtp_demuxer, track.control_path}
+        :tcp ->
+          {:rtp_demuxer, 0}
+
+        {:udp, _port_range_start, _port_range_end} ->
+          {{:rtp_demuxer, track.control_path}, Time.milliseconds(200)}
       end
 
     spec =
       get_child(demuxer_name)
-      |> via_out(:output, options: [stream_id: {:payload_type, track.rtpmap.payload_type}])
-      |> child({:jitter_buffer, make_ref()}, %Membrane.RTP.JitterBuffer{
-        clock_rate: track.rtpmap.clock_rate
-      })
+      |> via_out(:output,
+        options: [
+          stream_id: {:payload_type, track.rtpmap.payload_type},
+          jitter_buffer_latency: jitter_buffer_latency,
+          clock_rate: track.rtpmap.clock_rate
+        ]
+      )
       |> depayloader(track)
       |> parser(track)
       |> bin_output(pad)
