@@ -12,7 +12,7 @@ Add the following line to your deps in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:membrane_rtsp_plugin, "~> 0.6.1"}
+    {:membrane_rtsp_plugin, "~> 0.7.0"}
   ]
 end
 ```
@@ -45,26 +45,19 @@ defmodule RtspPipeline do
   end
 
   @impl true
-  def handle_child_notification({:new_track, ssrc, _track}, _element, _ctx, state) do
-    spec = [
-      get_child(:source)
-      |> via_out(Pad.ref(:output, ssrc))
-      |> child(:funnel, Membrane.Funnel)
-      |> child(:sink, , %Membrane.File.Source{
-        location: "video.h264"
-      })
-    ]
+  def handle_child_notification({:set_up_tracks, tracks}, _element, _ctx, state) do
+    spec =
+      Enum.map(track, fn track ->
+        get_child(:source)
+        |> via_out(Pad.ref(:output, track.control_path))
+        |> child(:sink, %Membrane.File.Source{location: "video.h264"})
+      end)
 
     {[spec: spec], state}
   end
 
   @impl true
   def handle_child_notification(_message, _element, _ctx, state) do
-    {[], state}
-  end
-
-  @impl true
-  def handle_child_pad_removed(:source, _pad, _ctx, state) do
     {[], state}
   end
 end

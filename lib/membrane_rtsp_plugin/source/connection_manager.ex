@@ -52,7 +52,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
 
     case RTSP.play(state.rtsp_session) do
       {:ok, %{status: 200}} ->
-        %{state | keep_alive_timer: start_keep_alive_timer(state)}
+        %{state | keep_alive_timer: start_keep_alive_timer(state), play_request_sent: true}
 
       _error ->
         handle_rtsp_error(:play_rtsp_failed, state)
