@@ -283,17 +283,17 @@ defmodule Membrane.RTSP.Source do
   @spec depayloader(ChildrenSpec.builder(), ConnectionManager.track()) :: ChildrenSpec.builder()
   defp depayloader(builder, track) do
     depayloader_definition =
-      case track do
-        %{rtpmap: %{encoding: "H264"}} ->
+      case {track.type, String.downcase(track.rtpmap.encoding)} do
+        {_type, "h264"} ->
           Membrane.RTP.H264.Depayloader
 
-        %{rtpmap: %{encoding: "H265"}} ->
+        {_type, "h265"} ->
           Membrane.RTP.H265.Depayloader
 
-        %{rtpmap: %{encoding: "opus"}} ->
+        {_type, "opus"} ->
           Membrane.RTP.Opus.Depayloader
 
-        %{type: :audio, rtpmap: %{encoding: "mpeg4-generic"}} ->
+        {:audio, "mpeg4-generic"} ->
           mode =
             case track.fmtp do
               %{mode: :AAC_hbr} -> :hbr
@@ -302,7 +302,7 @@ defmodule Membrane.RTSP.Source do
 
           %Membrane.RTP.AAC.Depayloader{mode: mode}
 
-        %{rtpmap: %{encoding: _other}} ->
+        {_type, _encoding} ->
           nil
       end
 
