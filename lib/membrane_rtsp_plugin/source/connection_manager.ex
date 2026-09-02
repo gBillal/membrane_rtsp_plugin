@@ -59,13 +59,19 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     end
   end
 
-  @spec keep_alive(State.t()) :: State.t()
+  @spec keep_alive(State.t()) :: {:ok, State.t()} | {:error, term()}
   def keep_alive(state) do
     Membrane.Logger.debug("Send GET_PARAMETER to keep session alive")
 
-    {:ok, %{status: 200}} = RTSP.get_parameter(state.rtsp_session)
+    case RTSP.get_parameter(state.rtsp_session) do
+      {:ok, %{status: 200}} ->
+        {:ok, %{state | keep_alive_timer: start_keep_alive_timer(state)}}
 
-    %{state | keep_alive_timer: start_keep_alive_timer(state)}
+      other ->
+        Membrane.Logger.debug("RTSP keep-alive failed: #{inspect(other)}")
+        if state.rtsp_session != nil, do: RTSP.close(state.rtsp_session)
+        {:error, :keep_alive_failed}
+    end
   end
 
   @spec start_rtsp_connection(Membrane.UtilitySupervisor.t(), State.t()) ::
