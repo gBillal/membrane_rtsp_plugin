@@ -115,6 +115,23 @@ defmodule Membrane.RTSP.SourceTest do
            "content is not the same"
   end
 
+  test "sends TEARDOWN when the pipeline is terminated", %{server_port: port, tmp_dir: tmp_dir} do
+    Process.register(self(), :rtsp_teardown_listener)
+
+    pid =
+      Membrane.Testing.Pipeline.start_link_supervised!(
+        module: TestPipeline,
+        custom_args: %{port: port, dest_folder: tmp_dir}
+      )
+
+    assert_pipeline_notified(pid, :source, {:set_up_tracks, _tracks})
+    # The server only reports TEARDOWN once PLAY has gone through
+    assert_start_of_stream(pid, {:sink, _ref}, :input, 5_000)
+    :ok = Membrane.Testing.Pipeline.terminate(pid)
+
+    assert_receive :teardown, 2_000
+  end
+
   test "stream specific media using tcp", %{server_port: port, tmp_dir: tmp_dir} do
     options = [
       module: TestPipeline,

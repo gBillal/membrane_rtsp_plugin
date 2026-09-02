@@ -101,6 +101,7 @@ defmodule Membrane.RTSP.RequestHandler do
 
   @impl true
   def handle_teardown(state) do
+    if pid = Process.whereis(:rtsp_teardown_listener), do: send(pid, :teardown)
     :gen_tcp.close(state.socket)
     {Response.new(200), state}
   end

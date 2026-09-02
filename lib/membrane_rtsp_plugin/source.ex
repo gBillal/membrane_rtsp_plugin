@@ -227,6 +227,7 @@ defmodule Membrane.RTSP.Source do
 
   @impl true
   def handle_terminate_request(_ctx, state) do
+    ConnectionManager.teardown(state)
     {[terminate: :normal], state}
   end
 

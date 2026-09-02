@@ -8,6 +8,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   alias Membrane.RTSP.Source.State
 
   @content_type_header [{"accept", "application/sdp"}]
+  @teardown_timeout 1_000
 
   @type t() :: pid()
   @type media_types :: [:video | :audio | :application]
@@ -66,6 +67,31 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
     {:ok, %{status: 200}} = RTSP.get_parameter(state.rtsp_session)
 
     %{state | keep_alive_timer: start_keep_alive_timer(state)}
+  end
+
+  @doc """
+  Sends TEARDOWN so the server frees the session immediately, then closes the
+  session process.
+
+  Best effort: the request is written to the socket at once and only the wait
+  for the reply is bounded, so a dead or unresponsive server cannot stall
+  shutdown for the full response timeout.
+  """
+  @spec teardown(State.t()) :: :ok
+  def teardown(%{rtsp_session: nil}), do: :ok
+
+  def teardown(%{rtsp_session: session}) do
+    task =
+      Task.async(fn ->
+        try do
+          RTSP.teardown(session)
+        catch
+          :exit, _reason -> :error
+        end
+      end)
+
+    Task.yield(task, @teardown_timeout) || Task.shutdown(task, :brutal_kill)
+    RTSP.close(session)
   end
 
   @spec start_rtsp_connection(Membrane.UtilitySupervisor.t(), State.t()) ::
@@ -214,7 +240,7 @@ defmodule Membrane.RTSP.Source.ConnectionManager do
   @spec handle_rtsp_error(term(), State.t()) :: no_return()
   defp handle_rtsp_error(reason, state) do
     Membrane.Logger.error("could not connect to RTSP server due to: #{inspect(reason)}")
-    if state.rtsp_session != nil, do: RTSP.close(state.rtsp_session)
+    teardown(state)
 
     raise "RTSP connection failed, reason: #{inspect(reason)}"
   end
