@@ -111,4 +111,21 @@ defmodule Membrane.RTSP.TCP.Decapsulator do
         {rtsp_message_start, Enum.reverse(complete_packets_binaries)}
     end
   end
+
+  # Stream desync: we're not positioned at an interleaved frame ("$") or an RTSP message, so the
+  # clauses above can't match (this is what crashed with a FunctionClauseError). Resync to the
+  # next frame marker instead of crashing; if there's no marker, drop the buffer so
+  # unprocessed_data can't grow without bound. A transient desync recovers and keeps streaming;
+  # a persistently broken stream emits no buffers and is reconnected by the keep-alive
+  # down-detector with backoff -- far better than the prior crash-reconnect loop.
+  defp get_complete_packets(packets_binary, rtsp_session, complete_packets) do
+    case :binary.match(packets_binary, "$") do
+      {pos, _len} when pos > 0 ->
+        <<_dropped::binary-size(pos), resynced::binary>> = packets_binary
+        get_complete_packets(resynced, rtsp_session, complete_packets)
+
+      _ ->
+        {<<>>, Enum.reverse(complete_packets)}
+    end
+  end
 end
